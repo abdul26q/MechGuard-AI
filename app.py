@@ -4,7 +4,7 @@ import re
 import time
 import pandas as pd
 import streamlit as st
-from groq import Groq
+import google.generativeai as genai
 
 # -----------------------------------------------------------------------------
 # 1. Page Configuration & Custom Theme
@@ -18,14 +18,15 @@ st.set_page_config(
 
 def get_api_key():
     """Safely fetch API Key from Streamlit Secrets or Environment Variables."""
-    if "GROQ_API_KEY" in st.secrets:
-        return st.secrets["GROQ_API_KEY"]
+    # Check for GOOGLE_API_KEY
+    if "GOOGLE_API_KEY" in st.secrets:
+        return st.secrets["GOOGLE_API_KEY"]
     
-    env_key = os.getenv("GROQ_API_KEY")
+    env_key = os.getenv("GOOGLE_API_KEY")
     if env_key:
         return env_key
         
-    st.error("🔑 Groq API Key missing! Add `GROQ_API_KEY` to `.streamlit/secrets.toml` or set it as an environment variable.")
+    st.error("🔑 Google API Key missing! Add `GOOGLE_API_KEY` to `.streamlit/secrets.toml` or set it as an environment variable.")
     st.stop()
 
 # Custom Styling
@@ -61,19 +62,23 @@ with st.sidebar:
     if os.path.exists("logo.png"):
         st.image("logo.png", width=400)
     st.title("System Status")
-    st.success("⚙️ MechGuard AI Core: Active")
+    st.success("️ MechGuard AI Core: Active")
     st.info("🔧 Material Availability & Manufacturing Risk Analysis: Active")
     st.markdown("---")
-    st.caption("• **Low Risk ():** Standard parts, multiple suppliers, stable materials")
+    st.caption("• **Low Risk (🟢):** Standard parts, multiple suppliers, stable materials")
     st.caption("• **Medium Risk (🟡):** Limited suppliers, material constraints, long lead times")
     st.caption("• **High Risk (🔴):** Single source, obsolete processes, material scarcity")
 
 # -----------------------------------------------------------------------------
-# 3. AI Engine Core Functions
+# 3. AI Engine Core Functions (GEMINI)
 # -----------------------------------------------------------------------------
-def analyze_mechanical_components_with_groq(bom_data_str, api_key):
+def analyze_mechanical_components_with_gemini(bom_data_str, api_key):
     try:
-        client = Groq(api_key=api_key)
+        # Configure Gemini
+        genai.configure(api_key=api_key)
+        
+        # Use gemini-1.5-flash for fast JSON generation, or gemini-1.5-pro for complex reasoning
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
         prompt = f"""
         You are an expert Mechanical Engineering Supply Chain Analyst, Manufacturing Process Specialist, and Material Science Expert.
@@ -172,15 +177,18 @@ def analyze_mechanical_components_with_groq(bom_data_str, api_key):
         Do not wrap in triple backticks or write conversational text. Output pure JSON only.
         """
 
-        response = client.chat.completions.create(
-            model="llama3-70b-8192",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0
+        # Generate content
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                temperature=0.0,
+                response_mime_type="application/json" # Force JSON output if supported, otherwise text
+            )
         )
 
-        text = response.choices[0].message.content.strip()
+        text = response.text
 
-        # Clean markdown code wrappers
+        # Clean markdown code wrappers just in case
         if text.startswith("```json"):
             text = text[7:]
         if text.startswith("```"):
@@ -223,13 +231,13 @@ def render_mechanical_component_card(item):
     # Risk level badge
     risk_upper = risk_level.upper()
     if "HIGH" in risk_upper:
-        badge = " HIGH RISK"
+        badge = "🔴 HIGH RISK"
         risk_class = "risk-high"
     elif "MEDIUM" in risk_upper:
         badge = "🟡 MEDIUM RISK"
         risk_class = "risk-medium"
     else:
-        badge = " LOW RISK"
+        badge = "🟢 LOW RISK"
         risk_class = "risk-low"
 
     mcmaster_url = links.get("mcmaster", "https://www.mcmaster.com/")
@@ -284,7 +292,7 @@ def render_mechanical_component_card(item):
                 st.success(f"✓ {rec}")
 
         st.markdown("**Supplier & Distributor Links:**")
-        st.markdown(f"[ McMaster-Carr]({mcmaster_url}) &nbsp;|&nbsp; [ Grainger]({grainger_url}) &nbsp;|&nbsp; [⚡ Fastenal]({fastenal_url}) &nbsp;|&nbsp; [🌐 MISUMI]({misumi_url})")
+        st.markdown(f"[🔩 McMaster-Carr]({mcmaster_url}) &nbsp;|&nbsp; [🏭 Grainger]({grainger_url}) &nbsp;|&nbsp; [⚡ Fastenal]({fastenal_url}) &nbsp;|&nbsp; [🌐 MISUMI]({misumi_url})")
 
 # -----------------------------------------------------------------------------
 # 4. Interface Tabs
@@ -308,13 +316,13 @@ with tab1:
 
     if btn_search and search_part.strip():
         active_key = get_api_key()
-        with st.spinner(f"🤖 Analyzing supply chain risk for {search_part.strip()}..."):
+        with st.spinner(f" Analyzing supply chain risk for {search_part.strip()}..."):
             query_str = f"Part: {search_part.strip()} | Single Part Risk Analysis"
-            search_results = analyze_mechanical_components_with_groq(query_str, active_key)
+            search_results = analyze_mechanical_components_with_gemini(query_str, active_key)
 
         if search_results:
             st.markdown("---")
-            st.subheader(" Component Risk Analysis Results")
+            st.subheader("🔍 Component Risk Analysis Results")
             for item in search_results:
                 render_mechanical_component_card(item)
 
@@ -346,7 +354,7 @@ with tab2:
 
         col_map = {str(col).strip().lower(): col for col in bom_df.columns}
 
-        with st.expander(f"📄 Raw Uploaded BOM Data Preview ({len(bom_df)} Total Rows)", expanded=False):
+        with st.expander(f" Raw Uploaded BOM Data Preview ({len(bom_df)} Total Rows)", expanded=False):
             st.dataframe(bom_df, use_container_width=True)
 
         col_btn_audit, _ = st.columns([1, 3])
@@ -383,11 +391,11 @@ with tab2:
                 st.error("❌ No valid part numbers detected! Ensure columns like 'Part Number' or 'Part No' exist in your file.")
             else:
                 total_items = len(bom_summary)
-                CHUNK_SIZE = 10  # Smaller chunks for detailed mechanical analysis
+                CHUNK_SIZE = 15  # Gemini handles larger contexts well
                 bom_chunks = [bom_summary[i:i + CHUNK_SIZE] for i in range(0, total_items, CHUNK_SIZE)]
                 total_chunks = len(bom_chunks)
 
-                st.info(f"📦 Processing **{total_items} mechanical components** across **{total_chunks} batch requests** (10 parts/batch) for detailed risk analysis...")
+                st.info(f"📦 Processing **{total_items} mechanical components** across **{total_chunks} batch requests** (15 parts/batch)...")
 
                 progress_bar = st.progress(0)
                 status_text = st.empty()
@@ -397,7 +405,7 @@ with tab2:
                     status_text.text(f"⏳ Analyzing Batch {idx + 1} of {total_chunks} ({len(chunk)} parts)...")
                     
                     bom_data_str = "\n".join(chunk)
-                    chunk_results = analyze_mechanical_components_with_groq(bom_data_str, active_key)
+                    chunk_results = analyze_mechanical_components_with_gemini(bom_data_str, active_key)
 
                     if chunk_results and isinstance(chunk_results, list):
                         all_results.extend(chunk_results)
@@ -406,9 +414,9 @@ with tab2:
 
                     progress_bar.progress((idx + 1) / total_chunks)
 
-                    # 1.5 second pause for detailed mechanical analysis
+                    # Small pause to respect rate limits
                     if idx < total_chunks - 1:
-                        time.sleep(1.5)
+                        time.sleep(1.0)
 
                 status_text.success("✅ Complete Mechanical BOM Risk Audit Finished!")
 
@@ -422,7 +430,7 @@ with tab2:
                     risk_score = round(((high_risk * 1.0 + medium_risk * 0.5) / max(total_parts, 1)) * 100, 1)
 
                     # Executive KPI Summary Dashboard
-                    st.subheader("📊 Mechanical BOM Risk Overview")
+                    st.subheader(" Mechanical BOM Risk Overview")
                     m1, m2, m3, m4 = st.columns(4)
                     m1.metric("Total Components Audited", total_parts)
                     m2.metric("Low Risk Components", low_risk, delta="Stable Supply", delta_color="normal")
@@ -453,7 +461,7 @@ with tab2:
                     csv_data = export_df.to_csv(index=False).encode('utf-8')
 
                     st.download_button(
-                        label=f" Export Full Mechanical Risk Report ({len(export_df)} Items CSV)",
+                        label=f"📥 Export Full Mechanical Risk Report ({len(export_df)} Items CSV)",
                         data=csv_data,
                         file_name="MechGuard_Full_BOM_Risk_Report.csv",
                         mime="text/csv",
