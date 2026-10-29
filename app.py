@@ -101,7 +101,7 @@ st.markdown('<div class="sub-header">Enterprise Mechanical Component Risk & Sour
 with st.sidebar:
     st.title("System Status")
     st.success("⚙️ Core Engine: Active")
-    st.info(" Risk Analysis: Ready")
+    st.info("🔧 Risk Analysis: Ready")
     st.markdown("---")
     st.caption("• **Low Risk (🟢):** Standard, stable supply")
     st.caption("• **Medium Risk (🟡):** Limited suppliers")
@@ -110,16 +110,15 @@ with st.sidebar:
     st.caption("⚠️ **Disclaimer:** AI suggestions require human engineering verification before production.")
 
 # -----------------------------------------------------------------------------
-# 2. AI Engine Core Functions (Optimized for Tokens & Efficiency)
+# 2. AI Engine Core Functions (Robust JSON Parsing)
 # -----------------------------------------------------------------------------
 
 @st.cache_data(show_spinner=False)
 def analyze_mechanical_components(bom_data_str, api_key):
-    """Analyze mechanical BOM components with foolproof JSON parsing and auto-repair."""
+    """Analyze mechanical BOM components with foolproof JSON parsing."""
     try:
         client = Groq(api_key=api_key)
 
-        # Compressed prompt with critical rule for modern standards
         prompt = f"""Role: Mechanical Supply Chain Analyst.
 Analyze the BOM data below. Output ONLY a raw JSON array. No markdown, no conversational text.
 
@@ -180,51 +179,96 @@ BOM DATA:
 
         text = response.choices[0].message.content.strip()
 
-        # FOOLPROOF JSON EXTRACTION WITH AUTO-REPAIR
+        # FOOLPROOF JSON EXTRACTION
         # Step 1: Remove markdown code blocks
         text = re.sub(r'^```json\s*', '', text, flags=re.MULTILINE)
         text = re.sub(r'\s*```$', '', text, flags=re.MULTILINE)
         text = text.strip()
         
-        # Step 2: Try to extract the JSON array
-        match = re.search(r'\[.*\]', text, re.DOTALL)
-        if not match:
+        # Step 2: Extract the JSON array using brace-depth counting
+        array_start = text.find('[')
+        array_end = text.rfind(']')
+        
+        if array_start == -1 or array_end == -1 or array_end <= array_start:
             raise ValueError("No JSON array found in AI response.")
         
-        json_str = match.group(0)
+        json_str = text[array_start:array_end + 1]
         
-        # Step 3: Try parsing directly first
+        # Step 3: Try parsing directly
         try:
-            return json.loads(json_str)
+            result = json.loads(json_str)
+            if isinstance(result, list) and len(result) > 0:
+                return result
         except json.JSONDecodeError:
-            pass  # Fall through to repair attempts
+            pass
         
         # Step 4: Auto-repair common JSON issues
-        # Fix trailing commas before ] or }
-        json_str = re.sub(r',\s*([\]}])', r'\1', json_str)
-        # Fix missing commas between objects: } { -> }, {
-        json_str = re.sub(r'\}\s*\{', '}, {', json_str)
-        # Fix missing commas between array items
-        json_str = re.sub(r'\]\s*\[', '], [', json_str)
+        repaired = json_str
+        repaired = re.sub(r',\s*([\]}])', r'\1', repaired)
+        repaired = re.sub(r'\}\s*\{', '}, {', repaired)
+        repaired = re.sub(r'\]\s*\[', '], [', repaired)
+        repaired = re.sub(r'(?<!\\)\n(?=[^"]*")', '\\n', repaired)
         
         try:
-            return json.loads(json_str)
+            result = json.loads(repaired)
+            if isinstance(result, list) and len(result) > 0:
+                return result
         except json.JSONDecodeError:
-            pass  # Fall through to individual object extraction
+            pass
         
-        # Step 5: Last resort - extract individual JSON objects
-        st.warning("⚠️ JSON was malformed. Extracting individual items...")
+        # Step 5: Last resort - extract individual top-level objects using brace-depth counting
+        st.warning("⚠️ JSON was malformed. Extracting individual items with brace-depth parser...")
         results = []
-        # Find all JSON objects (between { and })
-        object_pattern = re.compile(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', re.DOTALL)
-        for obj_match in object_pattern.finditer(json_str):
-            try:
-                obj = json.loads(obj_match.group(0))
-                results.append(obj)
-            except json.JSONDecodeError:
-                continue
+        
+        i = 0
+        while i < len(json_str):
+            if json_str[i] == '{':
+                depth = 0
+                start = i
+                in_string = False
+                escape_next = False
+                
+                while i < len(json_str):
+                    char = json_str[i]
+                    
+                    if escape_next:
+                        escape_next = False
+                        i += 1
+                        continue
+                    
+                    if char == '\\':
+                        escape_next = True
+                        i += 1
+                        continue
+                    
+                    if char == '"':
+                        in_string = not in_string
+                    elif not in_string:
+                        if char == '{':
+                            depth += 1
+                        elif char == '}':
+                            depth -= 1
+                            if depth == 0:
+                                obj_str = json_str[start:i + 1]
+                                try:
+                                    obj = json.loads(obj_str)
+                                    orig = obj.get("original_part", {})
+                                    name = orig.get("name", "")
+                                    schema_keywords = ["str", "int", "bool", "Factor 1", "Recommendation 1", "Exact part"]
+                                    is_schema = any(kw in str(obj) for kw in schema_keywords)
+                                    has_real_data = name and name not in ["", "Exact part name/number"]
+                                    
+                                    if not is_schema and has_real_data:
+                                        results.append(obj)
+                                except json.JSONDecodeError:
+                                    pass
+                                break
+                    i += 1
+            else:
+                i += 1
         
         if results:
+            st.success(f"✅ Recovered {len(results)} valid items from malformed JSON.")
             return results
         
         raise ValueError("Failed to parse any valid JSON from AI response.")
@@ -238,7 +282,6 @@ BOM DATA:
 
 def render_component_card(item):
     """Render a balanced component card with original and alternative details."""
-    # Safe extraction with defaults
     orig = item.get("original_part", {})
     risk = item.get("risk_assessment", {})
     alt = item.get("recommended_alternative", {})
@@ -247,7 +290,6 @@ def render_component_card(item):
     sourcing = item.get("sourcing", {})
     analysis = item.get("analysis", {})
 
-    # Original Part Data
     part_name = orig.get("name", "Unknown Part")
     part_type = orig.get("type", "N/A")
     part_mfr = orig.get("manufacturer", "N/A")
@@ -258,7 +300,6 @@ def render_component_card(item):
     risk_factors = risk.get("risk_factors", [])
     lead_time = risk.get("lead_time_weeks", "N/A")
     
-    # Alternative Part Data
     alt_name = alt.get("name", "None suggested")
     alt_type = alt.get("type", part_type)
     alt_mfr = alt.get("manufacturer", "N/A")
@@ -275,7 +316,6 @@ def render_component_card(item):
     dfm_recs = analysis.get("dfm_recommendations", [])
     summary = analysis.get("summary", "No summary provided.")
 
-    # Risk Badge Logic
     risk_upper = str(risk_level).upper()
     if "HIGH" in risk_upper:
         badge = "🔴 HIGH RISK"
@@ -288,8 +328,6 @@ def render_component_card(item):
         risk_class = "risk-low"
 
     with st.expander(f"{badge}  |  {part_type}: {part_name}", expanded=True):
-        
-        # Confidence & Warning
         st.markdown(f'<div class="confidence-badge">🎯 AI Confidence: {confidence}%</div>', unsafe_allow_html=True)
         st.warning("⚠️ **Engineering Verification Required:** AI alternatives are based on standard industry equivalents. Always verify physical dimensions and official datasheets before production.")
 
@@ -338,11 +376,11 @@ def render_component_card(item):
         st.write(summary)
 
         if dfm_recs:
-            st.markdown("**️ DFM Recommendations:**")
+            st.markdown("**🛠️ DFM Recommendations:**")
             for rec in dfm_recs:
                 st.success(f"✓ {rec}")
 
-        st.markdown("** Verification & Sourcing:**")
+        st.markdown("**🔍 Verification & Sourcing:**")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown(f"**Datasheet Query:** `{ds_query}`")
@@ -427,10 +465,9 @@ with tab2:
                 all_results = []
 
                 for idx, chunk in enumerate(bom_chunks):
-                    status_text.text(f" Analyzing Batch {idx + 1} of {len(bom_chunks)}...")
+                    status_text.text(f"🔍 Analyzing Batch {idx + 1} of {len(bom_chunks)}...")
                     bom_data_str = "\n".join(chunk)
                     
-                    # The cache will automatically skip API calls if this exact chunk was analyzed before
                     chunk_results = analyze_mechanical_components(bom_data_str, active_key)
                     
                     if chunk_results:
