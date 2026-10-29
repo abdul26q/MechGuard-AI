@@ -12,11 +12,12 @@ from groq import Groq
 st.set_page_config(
     page_title="MechGuard AI | Enterprise Risk Engine",
     layout="wide",
-    page_icon="️",
+    page_icon="⚙️",
     initial_sidebar_state="expanded"
 )
 
 def get_api_key():
+    """Safely fetch API Key from Streamlit Secrets or Environment Variables."""
     if "GROQ_API_KEY" in st.secrets:
         return st.secrets["GROQ_API_KEY"]
     env_key = os.getenv("GROQ_API_KEY")
@@ -50,7 +51,46 @@ st.markdown("""
     .risk-medium { color: #F59E0B; font-weight: 700; }
     .risk-low { color: #10B981; font-weight: 700; }
     .confidence-badge { background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; display: inline-block; margin-bottom: 10px; }
+    
+    /* Back to Landing Page Button */
+    .back-button-container {
+        position: fixed;
+        top: 24px;
+        left: 24px;
+        z-index: 9999;
+    }
+    .back-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background-color: #28282a;
+        color: #c8c8c8;
+        padding: 10px 20px;
+        border-radius: 999px;
+        text-decoration: none;
+        font-family: 'Inter', sans-serif;
+        font-weight: 500;
+        font-size: 14px;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.16);
+        transition: all 0.2s ease;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .back-button:hover {
+        background-color: #323234;
+        color: #ffffff;
+        transform: translateY(-1px);
+    }
 </style>
+""", unsafe_allow_html=True)
+
+# Back to Landing Page Button
+# ⚠️ IMPORTANT: Replace the URL below with your actual Netlify/Vercel landing page URL!
+st.markdown("""
+<div class="back-button-container">
+    <a href="https://YOUR-LANDING-PAGE-URL.netlify.app" class="back-button" target="_self">
+        ← Back to Landing Page
+    </a>
+</div>
 """, unsafe_allow_html=True)
 
 # Header
@@ -63,9 +103,9 @@ with st.sidebar:
     st.success("⚙️ Core Engine: Active")
     st.info(" Risk Analysis: Ready")
     st.markdown("---")
-    st.caption("• **Low Risk ():** Standard, stable supply")
+    st.caption("• **Low Risk (🟢):** Standard, stable supply")
     st.caption("• **Medium Risk (🟡):** Limited suppliers")
-    st.caption("• **High Risk ():** Single source/Obsolete")
+    st.caption("• **High Risk (🔴):** Single source/Obsolete")
     st.markdown("---")
     st.caption("⚠️ **Disclaimer:** AI suggestions require human engineering verification before production.")
 
@@ -73,15 +113,17 @@ with st.sidebar:
 # 2. AI Engine Core Functions (Optimized for Tokens & Efficiency)
 # -----------------------------------------------------------------------------
 
-# TWEAK 1: CACHING - Prevents duplicate API calls for the same search/BOM
 @st.cache_data(show_spinner=False)
 def analyze_mechanical_components(bom_data_str, api_key):
+    """Analyze mechanical BOM components with foolproof JSON parsing and auto-repair."""
     try:
         client = Groq(api_key=api_key)
 
-        # TWEAK 2: COMPRESSED PROMPT - Reduces input tokens while maintaining strict schema adherence
+        # Compressed prompt with critical rule for modern standards
         prompt = f"""Role: Mechanical Supply Chain Analyst.
 Analyze the BOM data below. Output ONLY a raw JSON array. No markdown, no conversational text.
+
+CRITICAL RULE: If the original part uses an obsolete or legacy standard (e.g., DIN 931, BSW), you MUST recommend the modern ISO/ANSI equivalent (e.g., ISO 4014, UNC) in the alternative's "standard" field.
 
 STRICT JSON SCHEMA:
 [
@@ -103,7 +145,7 @@ STRICT JSON SCHEMA:
       "type": "Component category",
       "manufacturer": "Alternative Company",
       "material": "Alternative material",
-      "standard": "Industry Standard",
+      "standard": "MODERN Industry Standard (ISO/ANSI preferred over DIN)",
       "lead_time_weeks": 2
     }},
     "compatibility": {{
@@ -133,31 +175,69 @@ BOM DATA:
             model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
-            # TWEAK 3: CAPPED OUTPUT - 4096 is safe for batches of 8, prevents AI rambling
-            max_tokens=4096 
+            max_tokens=4096
         )
 
         text = response.choices[0].message.content.strip()
 
-        # FOOLPROOF JSON EXTRACTION
+        # FOOLPROOF JSON EXTRACTION WITH AUTO-REPAIR
+        # Step 1: Remove markdown code blocks
         text = re.sub(r'^```json\s*', '', text, flags=re.MULTILINE)
         text = re.sub(r'\s*```$', '', text, flags=re.MULTILINE)
+        text = text.strip()
         
+        # Step 2: Try to extract the JSON array
         match = re.search(r'\[.*\]', text, re.DOTALL)
-        if match:
-            json_str = match.group(0)
-            return json.loads(json_str)
-        else:
+        if not match:
             raise ValueError("No JSON array found in AI response.")
+        
+        json_str = match.group(0)
+        
+        # Step 3: Try parsing directly first
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError:
+            pass  # Fall through to repair attempts
+        
+        # Step 4: Auto-repair common JSON issues
+        # Fix trailing commas before ] or }
+        json_str = re.sub(r',\s*([\]}])', r'\1', json_str)
+        # Fix missing commas between objects: } { -> }, {
+        json_str = re.sub(r'\}\s*\{', '}, {', json_str)
+        # Fix missing commas between array items
+        json_str = re.sub(r'\]\s*\[', '], [', json_str)
+        
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError:
+            pass  # Fall through to individual object extraction
+        
+        # Step 5: Last resort - extract individual JSON objects
+        st.warning("⚠️ JSON was malformed. Extracting individual items...")
+        results = []
+        # Find all JSON objects (between { and })
+        object_pattern = re.compile(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', re.DOTALL)
+        for obj_match in object_pattern.finditer(json_str):
+            try:
+                obj = json.loads(obj_match.group(0))
+                results.append(obj)
+            except json.JSONDecodeError:
+                continue
+        
+        if results:
+            return results
+        
+        raise ValueError("Failed to parse any valid JSON from AI response.")
 
     except json.JSONDecodeError as e:
-        st.error(f"️ AI returned invalid JSON. Please try again. Error: {str(e)}")
+        st.error(f"⚠️ AI returned invalid JSON. Please try again. Error: {str(e)}")
         return None
     except Exception as e:
         st.error(f"Analysis Error: {str(e)}")
         return None
 
 def render_component_card(item):
+    """Render a balanced component card with original and alternative details."""
     # Safe extraction with defaults
     orig = item.get("original_part", {})
     risk = item.get("risk_assessment", {})
@@ -180,7 +260,7 @@ def render_component_card(item):
     
     # Alternative Part Data
     alt_name = alt.get("name", "None suggested")
-    alt_type = alt.get("type", part_type) 
+    alt_type = alt.get("type", part_type)
     alt_mfr = alt.get("manufacturer", "N/A")
     alt_mat = alt.get("material", "N/A")
     alt_std = alt.get("standard", "N/A")
@@ -198,7 +278,7 @@ def render_component_card(item):
     # Risk Badge Logic
     risk_upper = str(risk_level).upper()
     if "HIGH" in risk_upper:
-        badge = " HIGH RISK"
+        badge = "🔴 HIGH RISK"
         risk_class = "risk-high"
     elif "MEDIUM" in risk_upper:
         badge = "🟡 MEDIUM RISK"
@@ -251,18 +331,18 @@ def render_component_card(item):
             st.markdown(right_box, unsafe_allow_html=True)
 
         st.markdown("---")
-        st.markdown("** Compatibility Logic:**")
+        st.markdown("**🔗 Compatibility Logic:**")
         st.info(compat_logic)
         
         st.markdown("**📊 Supply Chain Analysis:**")
         st.write(summary)
 
         if dfm_recs:
-            st.markdown("**🛠️ DFM Recommendations:**")
+            st.markdown("**️ DFM Recommendations:**")
             for rec in dfm_recs:
                 st.success(f"✓ {rec}")
 
-        st.markdown("**🔍 Verification & Sourcing:**")
+        st.markdown("** Verification & Sourcing:**")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown(f"**Datasheet Query:** `{ds_query}`")
@@ -274,7 +354,7 @@ def render_component_card(item):
 # -----------------------------------------------------------------------------
 # 3. Interface Tabs
 # -----------------------------------------------------------------------------
-tab1, tab2 = st.tabs(["🔍 Instant Part Search", " Batch BOM Audit"])
+tab1, tab2 = st.tabs(["🔍 Instant Part Search", "📁 Batch BOM Audit"])
 
 # TAB 1: INSTANT SEARCH
 with tab1:
@@ -287,7 +367,7 @@ with tab1:
             label_visibility="collapsed"
         )
     with col_btn_search:
-        btn_search = st.button(" Analyze Risk", type="primary", use_container_width=True)
+        btn_search = st.button("🔎 Analyze Risk", type="primary", use_container_width=True)
 
     if btn_search and search_part.strip():
         active_key = get_api_key()
@@ -317,7 +397,7 @@ with tab2:
                     uploaded_file.seek(0)
                     bom_df = pd.read_excel(uploaded_file)
                 except Exception as parse_err:
-                    st.error(f" Unable to parse file: {str(parse_err)}")
+                    st.error(f"❌ Unable to parse file: {str(parse_err)}")
                     st.stop()
 
         col_map = {str(col).strip().lower(): col for col in bom_df.columns}
@@ -339,7 +419,7 @@ with tab2:
                 st.error("❌ No valid part numbers detected!")
             else:
                 total_items = len(bom_summary)
-                CHUNK_SIZE = 8 
+                CHUNK_SIZE = 8
                 bom_chunks = [bom_summary[i:i + CHUNK_SIZE] for i in range(0, total_items, CHUNK_SIZE)]
                 
                 progress_bar = st.progress(0)
@@ -358,7 +438,7 @@ with tab2:
                     
                     progress_bar.progress((idx + 1) / len(bom_chunks))
                     if idx < len(bom_chunks) - 1:
-                        time.sleep(1.0) # Reduced pause slightly due to caching efficiency
+                        time.sleep(1.0)
 
                 status_text.success("✅ Audit Complete!")
 
@@ -377,3 +457,42 @@ with tab2:
                     st.markdown("---")
                     for item in all_results:
                         render_component_card(item)
+                    
+                    # Export CSV
+                    export_rows = []
+                    for item in all_results:
+                        orig = item.get("original_part", {})
+                        risk = item.get("risk_assessment", {})
+                        alt = item.get("recommended_alternative", {})
+                        compat = item.get("compatibility", {})
+                        analysis = item.get("analysis", {})
+                        
+                        export_rows.append({
+                            "Part Number": orig.get("name", ""),
+                            "Type": orig.get("type", ""),
+                            "Manufacturer": orig.get("manufacturer", ""),
+                            "Material": orig.get("material", ""),
+                            "Standard": orig.get("standard", ""),
+                            "Risk Level": risk.get("level", ""),
+                            "Lead Time (Weeks)": risk.get("lead_time_weeks", ""),
+                            "Risk Factors": "; ".join(risk.get("risk_factors", [])),
+                            "Alternative Part": alt.get("name", ""),
+                            "Alternative Manufacturer": alt.get("manufacturer", ""),
+                            "Alternative Material": alt.get("material", ""),
+                            "Alternative Standard": alt.get("standard", ""),
+                            "Drop-in Replacement": compat.get("is_drop_in", False),
+                            "Compatibility Logic": compat.get("logic", ""),
+                            "Summary": analysis.get("summary", "")
+                        })
+                    
+                    st.markdown("---")
+                    export_df = pd.DataFrame(export_rows)
+                    csv_data = export_df.to_csv(index=False).encode('utf-8')
+                    
+                    st.download_button(
+                        label="📥 Export Full Risk Report (CSV)",
+                        data=csv_data,
+                        file_name="MechGuard_BOM_Risk_Report.csv",
+                        mime="text/csv",
+                        type="primary"
+                    )
