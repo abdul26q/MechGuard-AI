@@ -5,6 +5,13 @@ import time
 import pandas as pd
 import streamlit as st
 import google.generativeai as genai
+# Temporary test - remove after confirming
+try:
+    genai.configure(api_key=get_api_key())
+    available = [m.name for m in genai.list_models()]
+    st.write("Available models:", [m for m in available if 'flash' in m])
+except Exception as e:
+    st.error(f"Model check failed: {e}")
 
 # -----------------------------------------------------------------------------
 # 1. Page Configuration & Custom Theme
