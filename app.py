@@ -34,13 +34,16 @@ st.markdown("""
     .sub-header { font-size: 1.05rem; color: #94A3B8; margin-bottom: 1.5rem; }
     
     /* Component Cards */
-    .comp-box-original { background-color: rgba(30, 27, 75, 0.6); padding: 16px; border-radius: 10px; border-left: 5px solid #6366F1; margin-bottom: 10px; backdrop-filter: blur(10px); }
-    .comp-box-recommended { background-color: rgba(6, 78, 59, 0.6); padding: 16px; border-radius: 10px; border-left: 5px solid #10B981; margin-bottom: 10px; backdrop-filter: blur(10px); }
-    .box-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; opacity: 0.8; }
+    .comp-box-original { background-color: rgba(30, 27, 75, 0.6); padding: 20px; border-radius: 12px; border-left: 5px solid #6366F1; margin-bottom: 10px; backdrop-filter: blur(10px); }
+    .comp-box-recommended { background-color: rgba(6, 78, 59, 0.6); padding: 20px; border-radius: 12px; border-left: 5px solid #10B981; margin-bottom: 10px; backdrop-filter: blur(10px); }
+    
+    .box-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; opacity: 0.9; }
     .title-orig { color: #A5B4FC; }
     .title-rec { color: #6EE7B7; }
-    .part-mpn { font-size: 1.25rem; font-weight: 800; color: #FFFFFF; margin-bottom: 4px; }
-    .part-detail { font-size: 0.9rem; color: #CBD5E1; margin-bottom: 4px; }
+    
+    .part-mpn { font-size: 1.3rem; font-weight: 800; color: #FFFFFF; margin-bottom: 8px; }
+    .part-detail { font-size: 0.9rem; color: #CBD5E1; margin-bottom: 6px; line-height: 1.4; }
+    .part-detail b { color: #94A3B8; font-weight: 500; }
     
     /* Badges */
     .risk-high { color: #EF4444; font-weight: 700; }
@@ -57,33 +60,28 @@ st.markdown('<div class="sub-header">Enterprise Mechanical Component Risk & Sour
 # Sidebar
 with st.sidebar:
     st.title("System Status")
-    st.success("️ Core Engine: Active")
-    st.info("🔧 Risk Analysis: Ready")
+    st.success("⚙️ Core Engine: Active")
+    st.info(" Risk Analysis: Ready")
     st.markdown("---")
-    st.caption("• **Low Risk (🟢):** Standard, stable supply")
+    st.caption("• **Low Risk ():** Standard, stable supply")
     st.caption("• **Medium Risk (🟡):** Limited suppliers")
-    st.caption("• **High Risk (🔴):** Single source/Obsolete")
+    st.caption("• **High Risk ():** Single source/Obsolete")
     st.markdown("---")
     st.caption("⚠️ **Disclaimer:** AI suggestions require human engineering verification before production.")
-    st.markdown("---") 
-    st.page_link("https://mechxguard.netlify.app", label="← Back to Landing Page", icon="🏠")
 
 # -----------------------------------------------------------------------------
-# 2. AI Engine Core Functions (Foolproof Prompting & Parsing)
+# 2. AI Engine Core Functions (Optimized for Tokens & Efficiency)
 # -----------------------------------------------------------------------------
+
+# TWEAK 1: CACHING - Prevents duplicate API calls for the same search/BOM
+@st.cache_data(show_spinner=False)
 def analyze_mechanical_components(bom_data_str, api_key):
     try:
         client = Groq(api_key=api_key)
 
-        prompt = f"""
-You are an expert Mechanical Engineering Supply Chain Analyst. 
-Analyze the following mechanical Bill of Materials (BOM) data.
-
-DATA:
-{bom_data_str}
-
-TASK:
-For each component, perform a deep technical analysis. You MUST output ONLY a valid JSON array. No markdown, no conversational text.
+        # TWEAK 2: COMPRESSED PROMPT - Reduces input tokens while maintaining strict schema adherence
+        prompt = f"""Role: Mechanical Supply Chain Analyst.
+Analyze the BOM data below. Output ONLY a raw JSON array. No markdown, no conversational text.
 
 STRICT JSON SCHEMA:
 [
@@ -92,7 +90,8 @@ STRICT JSON SCHEMA:
       "name": "Exact part name/number",
       "type": "Component category (e.g., Fastener, Bearing)",
       "manufacturer": "Original Company (e.g., SKF, Hilti)",
-      "material": "Exact material composition"
+      "material": "Exact material composition",
+      "standard": "Industry Standard (ISO/DIN/ANSI)"
     }},
     "risk_assessment": {{
       "level": "Low, Medium, or High",
@@ -101,13 +100,15 @@ STRICT JSON SCHEMA:
     }},
     "recommended_alternative": {{
       "name": "Alternative part name",
+      "type": "Component category",
       "manufacturer": "Alternative Company",
       "material": "Alternative material",
-      "standard": "Industry Standard (ISO/DIN/ANSI)"
+      "standard": "Industry Standard",
+      "lead_time_weeks": 2
     }},
     "compatibility": {{
       "is_drop_in": true,
-      "logic": "1-sentence engineering reason why they are compatible (e.g., matching thread pitch and tensile strength)",
+      "logic": "1-sentence engineering reason why they are compatible",
       "required_modifications": "None or specific changes needed"
     }},
     "verification": {{
@@ -124,23 +125,24 @@ STRICT JSON SCHEMA:
     }}
   }}
 ]
-"""
+
+BOM DATA:
+{bom_data_str}"""
 
         response = client.chat.completions.create(
             model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
-            max_completion_tokens=4096
+            # TWEAK 3: CAPPED OUTPUT - 4096 is safe for batches of 8, prevents AI rambling
+            max_tokens=4096 
         )
 
         text = response.choices[0].message.content.strip()
 
         # FOOLPROOF JSON EXTRACTION
-        # 1. Remove markdown code blocks if present
         text = re.sub(r'^```json\s*', '', text, flags=re.MULTILINE)
         text = re.sub(r'\s*```$', '', text, flags=re.MULTILINE)
         
-        # 2. Find the JSON array using regex (handles any surrounding text)
         match = re.search(r'\[.*\]', text, re.DOTALL)
         if match:
             json_str = match.group(0)
@@ -149,7 +151,7 @@ STRICT JSON SCHEMA:
             raise ValueError("No JSON array found in AI response.")
 
     except json.JSONDecodeError as e:
-        st.error(f"⚠️ AI returned invalid JSON. Please try again. Error: {str(e)}")
+        st.error(f"️ AI returned invalid JSON. Please try again. Error: {str(e)}")
         return None
     except Exception as e:
         st.error(f"Analysis Error: {str(e)}")
@@ -165,18 +167,24 @@ def render_component_card(item):
     sourcing = item.get("sourcing", {})
     analysis = item.get("analysis", {})
 
+    # Original Part Data
     part_name = orig.get("name", "Unknown Part")
     part_type = orig.get("type", "N/A")
     part_mfr = orig.get("manufacturer", "N/A")
     part_mat = orig.get("material", "N/A")
+    part_std = orig.get("standard", "N/A")
     
     risk_level = risk.get("level", "Unknown")
     risk_factors = risk.get("risk_factors", [])
     lead_time = risk.get("lead_time_weeks", "N/A")
     
+    # Alternative Part Data
     alt_name = alt.get("name", "None suggested")
+    alt_type = alt.get("type", part_type) 
     alt_mfr = alt.get("manufacturer", "N/A")
     alt_mat = alt.get("material", "N/A")
+    alt_std = alt.get("standard", "N/A")
+    alt_lead = alt.get("lead_time_weeks", "N/A")
     
     is_drop_in = compat.get("is_drop_in", False)
     compat_logic = compat.get("logic", "N/A")
@@ -190,7 +198,7 @@ def render_component_card(item):
     # Risk Badge Logic
     risk_upper = str(risk_level).upper()
     if "HIGH" in risk_upper:
-        badge = "🔴 HIGH RISK"
+        badge = " HIGH RISK"
         risk_class = "risk-high"
     elif "MEDIUM" in risk_upper:
         badge = "🟡 MEDIUM RISK"
@@ -215,6 +223,7 @@ def render_component_card(item):
                 f'<div class="part-detail"><b>Company:</b> {part_mfr}</div>'
                 f'<div class="part-detail"><b>Type:</b> {part_type}</div>'
                 f'<div class="part-detail"><b>Material:</b> {part_mat}</div>'
+                f'<div class="part-detail"><b>Standard:</b> {part_std}</div>'
                 f'<div class="part-detail"><b>Lead Time:</b> {lead_time} weeks</div>'
                 f'<div class="part-detail"><b>Status:</b> <span class="{risk_class}">{risk_level}</span></div>'
                 '</div>'
@@ -232,7 +241,10 @@ def render_component_card(item):
                 '<div class="box-title title-rec">Recommended Alternative</div>'
                 f'<div class="part-mpn">{alt_name}</div>'
                 f'<div class="part-detail"><b>Company:</b> {alt_mfr}</div>'
+                f'<div class="part-detail"><b>Type:</b> {alt_type}</div>'
                 f'<div class="part-detail"><b>Material:</b> {alt_mat}</div>'
+                f'<div class="part-detail"><b>Standard:</b> {alt_std}</div>'
+                f'<div class="part-detail"><b>Lead Time:</b> {alt_lead} weeks</div>'
                 f'<div class="part-detail"><b>Drop-in Replacement:</b> {"✅ Yes" if is_drop_in else "⚠️ No"}</div>'
                 '</div>'
             )
@@ -242,7 +254,7 @@ def render_component_card(item):
         st.markdown("** Compatibility Logic:**")
         st.info(compat_logic)
         
-        st.markdown("** Supply Chain Analysis:**")
+        st.markdown("**📊 Supply Chain Analysis:**")
         st.write(summary)
 
         if dfm_recs:
@@ -262,7 +274,7 @@ def render_component_card(item):
 # -----------------------------------------------------------------------------
 # 3. Interface Tabs
 # -----------------------------------------------------------------------------
-tab1, tab2 = st.tabs(["🔍 Instant Part Search", "📁 Batch BOM Audit"])
+tab1, tab2 = st.tabs(["🔍 Instant Part Search", " Batch BOM Audit"])
 
 # TAB 1: INSTANT SEARCH
 with tab1:
@@ -305,7 +317,7 @@ with tab2:
                     uploaded_file.seek(0)
                     bom_df = pd.read_excel(uploaded_file)
                 except Exception as parse_err:
-                    st.error(f"❌ Unable to parse file: {str(parse_err)}")
+                    st.error(f" Unable to parse file: {str(parse_err)}")
                     st.stop()
 
         col_map = {str(col).strip().lower(): col for col in bom_df.columns}
@@ -327,7 +339,7 @@ with tab2:
                 st.error("❌ No valid part numbers detected!")
             else:
                 total_items = len(bom_summary)
-                CHUNK_SIZE = 8 # Smaller chunk for higher accuracy
+                CHUNK_SIZE = 8 
                 bom_chunks = [bom_summary[i:i + CHUNK_SIZE] for i in range(0, total_items, CHUNK_SIZE)]
                 
                 progress_bar = st.progress(0)
@@ -337,6 +349,8 @@ with tab2:
                 for idx, chunk in enumerate(bom_chunks):
                     status_text.text(f" Analyzing Batch {idx + 1} of {len(bom_chunks)}...")
                     bom_data_str = "\n".join(chunk)
+                    
+                    # The cache will automatically skip API calls if this exact chunk was analyzed before
                     chunk_results = analyze_mechanical_components(bom_data_str, active_key)
                     
                     if chunk_results:
@@ -344,7 +358,7 @@ with tab2:
                     
                     progress_bar.progress((idx + 1) / len(bom_chunks))
                     if idx < len(bom_chunks) - 1:
-                        time.sleep(1.5)
+                        time.sleep(1.0) # Reduced pause slightly due to caching efficiency
 
                 status_text.success("✅ Audit Complete!")
 
