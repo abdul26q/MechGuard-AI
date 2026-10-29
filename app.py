@@ -69,7 +69,7 @@ with st.sidebar:
     st.caption("• **High Risk (🔴):** Single source, obsolete processes, material scarcity")
      #  HERE IS THE BACK BUTTON 👇
     st.markdown("---")
-    st.page_link("https://papaya-blancmange-a20aa4.netlify.app/", label="← Back to Landing Page", icon="🏠")
+    st.page_link("https://mechxguard.netlify.app", label="← Back to Landing Page", icon="🏠")
 
 # -----------------------------------------------------------------------------
 # 3. AI Engine Core Functions
