@@ -61,10 +61,10 @@ with st.sidebar:
     if os.path.exists("logo.png"):
         st.image("logo.png", width=400)
     st.title("System Status")
-    st.success("⚙️ MechGuard AI Core: Active")
+    st.success("️ MechGuard AI Core: Active")
     st.info("🔧 Material Availability & Manufacturing Risk Analysis: Active")
     st.markdown("---")
-    st.caption("• **Low Risk ():** Standard parts, multiple suppliers, stable materials")
+    st.caption("• **Low Risk (🟢):** Standard parts, multiple suppliers, stable materials")
     st.caption("• **Medium Risk (🟡):** Limited suppliers, material constraints, long lead times")
     st.caption("• **High Risk (🔴):** Single source, obsolete processes, material scarcity")
 
@@ -76,111 +76,71 @@ def analyze_mechanical_components_with_groq(bom_data_str, api_key):
         client = Groq(api_key=api_key)
 
         prompt = f"""
-        You are an expert Mechanical Engineering Supply Chain Analyst, Manufacturing Process Specialist, and Material Science Expert.
-        Your task is to analyze mechanical components submitted in a Bill of Materials (BOM), evaluate their supply chain risks, 
-        material availability, manufacturing process viability, and recommend alternative parts, materials, or processes.
+You are an expert Mechanical Engineering Supply Chain Analyst, Manufacturing Process Specialist, and Material Science Expert.
+Analyze mechanical components in this Bill of Materials (BOM) for supply chain risks, material availability, and recommend alternatives.
 
-        {bom_data_str}
+{bom_data_str}
 
-        ====================================================================================================
-        0. MANDATORY MECHANICAL COMPONENT PARSING PROTOCOL
-        ====================================================================================================
-        Before making any risk assessment, mentally deconstruct each mechanical component:
-        - STEP 1 (COMPONENT TYPE): Identify category (Fastener, Bearing, Gear, Spring, Structural, Housing, Custom Machined, etc.)
-        - STEP 2 (MATERIAL SPEC): Extract material (e.g., '6061-T6 Aluminum', '304 Stainless Steel', 'Delrin POM', 'AISI 4140')
-        - STEP 3 (STANDARD/SPEC): Identify standards (ISO, DIN, ANSI, ASME, JIS, ASTM, etc.)
-        - STEP 4 (MANUFACTURING PROCESS): Determine process (CNC Machining, Injection Molding, Stamping, Casting, Forging, 3D Printing, etc.)
-        - STEP 5 (DIMENSIONS & TOLERANCES): Note critical dimensions and tolerance classes (IT6, IT7, ±0.1mm, etc.)
-        - STEP 6 (SURFACE FINISH/TREATMENT): Identify finishes (Anodizing, Plating, Heat Treatment, Powder Coat, etc.)
+MANDATORY PARSING PROTOCOL:
+- Component Type: Fastener, Bearing, Gear, Spring, Structural, Housing, Custom Machined, etc.
+- Material Spec: e.g., '6061-T6 Aluminum', '304 Stainless Steel', 'Delrin POM'
+- Standard: ISO, DIN, ANSI, ASME, JIS, ASTM
+- Manufacturing Process: CNC, Injection Molding, Stamping, Casting, Forging, 3D Printing
+- Dimensions & Tolerances: IT6, IT7, ±0.1mm
+- Surface Finish: Anodizing, Plating, Heat Treatment, Powder Coat
 
-        ====================================================================================================
-        1. RISK ASSESSMENT CATEGORIES
-        ====================================================================================================
-        Classify each component's supply chain risk into one of these categories:
-        
-        **LOW RISK (🟢):**
-        - Standard off-the-shelf component
-        - Multiple qualified suppliers (3+)
-        - Common material with stable supply
-        - Standard manufacturing process
-        - Lead time < 4 weeks
-        
-        **MEDIUM RISK (🟡):**
-        - Semi-custom or limited standard options
-        - 2-3 qualified suppliers
-        - Material with moderate availability concerns
-        - Specialized manufacturing process
-        - Lead time 4-12 weeks
-        - Single standard (metric/imperial conversion needed)
-        
-        **HIGH RISK (🔴):**
-        - Custom designed part (single source)
-        - Sole supplier or obsolete manufacturer
-        - Critical material scarcity (rare alloys, restricted plastics)
-        - Obsolete manufacturing process
-        - Lead time > 12 weeks
-        - Regulatory restrictions (RoHS, REACH, conflict minerals)
+RISK CATEGORIES:
+- LOW RISK: Standard part, 3+ suppliers, common material, lead time < 4 weeks
+- MEDIUM RISK: Semi-custom, 2-3 suppliers, specialized process, lead time 4-12 weeks
+- HIGH RISK: Custom/single-source, scarce material, obsolete process, lead time > 12 weeks
 
-        ====================================================================================================
-        2. ALTERNATIVE SOURCING & SUBSTITUTION RULES
-        ====================================================================================================
-        - MATERIAL SUBSTITUTIONS: Suggest equivalent or superior materials (e.g., 6061-T6 → 7075-T6 for strength, 
-          304 SS → 316 SS for corrosion resistance, Steel → Aluminum for weight reduction)
-        - PROCESS SUBSTITUTIONS: Recommend alternative manufacturing (CNC → Casting for volume, Machined → 
-          Injection Molded for plastics, Traditional → Additive Manufacturing for prototypes)
-        - STANDARD CONVERSIONS: Provide metric/imperial equivalents (M8 → 5/16"-18, ISO → DIN → ANSI)
-        - SUPPLIER DIVERSIFICATION: Identify alternative manufacturers and distributors
-        - DESIGN MODIFICATIONS: Suggest DFM (Design for Manufacturing) improvements to reduce cost/lead time
+ALTERNATIVE RULES:
+- Material substitutions (6061-T6 → 7075-T6, 304 SS → 316 SS)
+- Process alternatives (CNC → Casting, Machined → Injection Molded)
+- Standard conversions (Metric ↔ Imperial)
+- DFM improvements
 
-        ====================================================================================================
-        3. STRICT OUTPUT POLICY & JSON SCHEMA
-        ====================================================================================================
-        Respond STRICTLY in valid raw JSON array format matching this exact schema:
-        [
-          {{
-            "part_number": "M8-1.25 x 25mm Socket Head Cap Screw",
-            "component_type": "Fastener - Socket Head Cap Screw",
-            "material": "Alloy Steel Grade 8.8",
-            "standard": "ISO 4762 / DIN 912",
-            "manufacturing_process": "Cold Forming + Thread Rolling",
-            "current_risk_level": "Low",
-            "risk_factors": [
-              "Standard off-the-shelf component",
-              "Multiple global suppliers available",
-              "Stable material supply chain"
-            ],
-            "lead_time_weeks": 2,
-            "alternative_part": "M8-1.25 x 25mm SHCS - Stainless Steel 316",
-            "alternative_material": "316 Stainless Steel (for corrosion resistance)",
-            "alternative_process": "Same - Cold Forming",
-            "alternative_standard": "ISO 4762 / DIN 912 (same standard)",
-            "pin_compatible": "Yes - Direct drop-in replacement with improved corrosion resistance",
-            "key_differences": "316 SS provides superior corrosion resistance vs alloy steel. Slightly lower tensile strength (Grade 8.8 equivalent). 15-20% cost increase.",
-            "supplier_links": {{
-              "mcmaster": "https://www.mcmaster.com/",
-              "grainger": "https://www.grainger.com/",
-              "fastenal": "https://www.fastenal.com/",
-              "misumi": "https://www.misumi-ec.com/"
-            }},
-            "analysis": "Standard M8 socket head cap screw with excellent availability. Consider 316 SS alternative if operating in corrosive environments. Current alloy steel is cost-effective for general applications.",
-            "dfm_recommendations": [
-              "Consider standardizing on one material across assembly",
-              "Evaluate if Grade 8.8 is necessary or if lower grade suffices"
-            ]
-          }}
-        ]
-        Do not wrap in triple backticks or write conversational text. Output pure JSON only.
-        """
+STRICT JSON OUTPUT (array format):
+[
+  {{
+    "part_number": "M8-1.25 x 25mm Socket Head Cap Screw",
+    "component_type": "Fastener - Socket Head Cap Screw",
+    "material": "Alloy Steel Grade 8.8",
+    "standard": "ISO 4762 / DIN 912",
+    "manufacturing_process": "Cold Forming + Thread Rolling",
+    "current_risk_level": "Low",
+    "risk_factors": ["Standard off-the-shelf", "Multiple suppliers", "Stable material"],
+    "lead_time_weeks": 2,
+    "alternative_part": "M8-1.25 x 25mm SHCS - Stainless Steel 316",
+    "alternative_material": "316 Stainless Steel",
+    "alternative_process": "Same - Cold Forming",
+    "alternative_standard": "ISO 4762 / DIN 912",
+    "pin_compatible": "Yes - Direct drop-in replacement",
+    "key_differences": "316 SS provides superior corrosion resistance. 15-20% cost increase.",
+    "supplier_links": {{
+      "mcmaster": "https://www.mcmaster.com/",
+      "grainger": "https://www.grainger.com/",
+      "fastenal": "https://www.fastenal.com/",
+      "misumi": "https://www.misumi-ec.com/"
+    }},
+    "analysis": "Standard M8 SHCS with excellent availability. Consider 316 SS for corrosive environments.",
+    "dfm_recommendations": ["Standardize material across assembly", "Evaluate if Grade 8.8 is necessary"]
+  }}
+]
+
+Output ONLY valid JSON array. No markdown, no explanations.
+"""
 
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.0
+            temperature=0.0,
+            max_completion_tokens=4096
         )
 
         text = response.choices[0].message.content.strip()
 
-        # Clean markdown code wrappers
+        # Clean markdown code wrappers just in case
         if text.startswith("```json"):
             text = text[7:]
         if text.startswith("```"):
@@ -223,13 +183,13 @@ def render_mechanical_component_card(item):
     # Risk level badge
     risk_upper = risk_level.upper()
     if "HIGH" in risk_upper:
-        badge = " HIGH RISK"
+        badge = "🔴 HIGH RISK"
         risk_class = "risk-high"
     elif "MEDIUM" in risk_upper:
         badge = "🟡 MEDIUM RISK"
         risk_class = "risk-medium"
     else:
-        badge = " LOW RISK"
+        badge = "🟢 LOW RISK"
         risk_class = "risk-low"
 
     mcmaster_url = links.get("mcmaster", "https://www.mcmaster.com/")
@@ -284,12 +244,12 @@ def render_mechanical_component_card(item):
                 st.success(f"✓ {rec}")
 
         st.markdown("**Supplier & Distributor Links:**")
-        st.markdown(f"[ McMaster-Carr]({mcmaster_url}) &nbsp;|&nbsp; [ Grainger]({grainger_url}) &nbsp;|&nbsp; [⚡ Fastenal]({fastenal_url}) &nbsp;|&nbsp; [🌐 MISUMI]({misumi_url})")
+        st.markdown(f"[🔩 McMaster-Carr]({mcmaster_url}) &nbsp;|&nbsp; [🏭 Grainger]({grainger_url}) &nbsp;|&nbsp; [⚡ Fastenal]({fastenal_url}) &nbsp;|&nbsp; [🌐 MISUMI]({misumi_url})")
 
 # -----------------------------------------------------------------------------
 # 4. Interface Tabs
 # -----------------------------------------------------------------------------
-tab1, tab2 = st.tabs(["🔍 Instant Part Search", "📁 Batch BOM Upload Audit"])
+tab1, tab2 = st.tabs(["🔍 Instant Part Search", " Batch BOM Upload Audit"])
 
 # TAB 1: INSTANT SEARCH
 with tab1:
@@ -314,7 +274,7 @@ with tab1:
 
         if search_results:
             st.markdown("---")
-            st.subheader(" Component Risk Analysis Results")
+            st.subheader("🔍 Component Risk Analysis Results")
             for item in search_results:
                 render_mechanical_component_card(item)
 
@@ -380,7 +340,7 @@ with tab2:
                     bom_summary.append(part_info)
 
             if not bom_summary:
-                st.error("❌ No valid part numbers detected! Ensure columns like 'Part Number' or 'Part No' exist in your file.")
+                st.error(" No valid part numbers detected! Ensure columns like 'Part Number' or 'Part No' exist in your file.")
             else:
                 total_items = len(bom_summary)
                 CHUNK_SIZE = 10  # Smaller chunks for detailed mechanical analysis
@@ -430,7 +390,7 @@ with tab2:
                     m4.metric("Overall Risk Score", f"{risk_score}%", delta="Critical Review Needed" if risk_score > 30 else "Acceptable Risk", delta_color="inverse" if risk_score > 30 else "normal")
 
                     st.markdown("---")
-                    st.subheader("🔍 Component Risk Analysis & Alternative Matrix")
+                    st.subheader(" Component Risk Analysis & Alternative Matrix")
 
                     export_rows = []
                     for item in all_results:
@@ -453,7 +413,7 @@ with tab2:
                     csv_data = export_df.to_csv(index=False).encode('utf-8')
 
                     st.download_button(
-                        label=f" Export Full Mechanical Risk Report ({len(export_df)} Items CSV)",
+                        label=f"📥 Export Full Mechanical Risk Report ({len(export_df)} Items CSV)",
                         data=csv_data,
                         file_name="MechGuard_Full_BOM_Risk_Report.csv",
                         mime="text/csv",
