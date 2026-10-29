@@ -10,128 +10,120 @@ from groq import Groq
 # 1. Page Configuration & Custom Theme
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="MechGuard AI | Mechanical Component Risk Engine",
+    page_title="MechGuard AI | Enterprise Risk Engine",
     layout="wide",
-    page_icon="⚙️",
+    page_icon="️",
     initial_sidebar_state="expanded"
 )
 
 def get_api_key():
-    """Safely fetch API Key from Streamlit Secrets or Environment Variables."""
     if "GROQ_API_KEY" in st.secrets:
         return st.secrets["GROQ_API_KEY"]
-    
     env_key = os.getenv("GROQ_API_KEY")
     if env_key:
         return env_key
-        
-    st.error("🔑 Groq API Key missing! Add `GROQ_API_KEY` to `.streamlit/secrets.toml` or set it as an environment variable.")
+    st.error("🔑 Groq API Key missing! Add `GROQ_API_KEY` to `.streamlit/secrets.toml`.")
     st.stop()
 
-# Custom Styling
+# Custom Styling (Dark Theme)
 st.markdown("""
 <style>
-    [data-testid="stMetricValue"] { font-size: 30px !important; font-weight: 800 !important; }
+    [data-testid="stMetricValue"] { font-size: 28px !important; font-weight: 800 !important; }
     [data-testid="stMetric"] { background-color: #1E293B; padding: 15px 20px; border-radius: 12px; border: 1px solid #334155; }
-    .main-header { font-size: 2.6rem; font-weight: 800; background: linear-gradient(90deg, #0EA5E9 0%, #22C55E 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.1rem; }
+    .main-header { font-size: 2.4rem; font-weight: 800; background: linear-gradient(90deg, #0EA5E9 0%, #22C55E 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.1rem; }
     .sub-header { font-size: 1.05rem; color: #94A3B8; margin-bottom: 1.5rem; }
-    .comp-box-original { background-color: #1E1B4B; padding: 16px; border-radius: 10px; border-left: 5px solid #6366F1; margin-bottom: 10px; }
-    .comp-box-recommended { background-color: #064E3B; padding: 16px; border-radius: 10px; border-left: 5px solid #10B981; margin-bottom: 10px; }
-    .box-title { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    
+    /* Component Cards */
+    .comp-box-original { background-color: rgba(30, 27, 75, 0.6); padding: 16px; border-radius: 10px; border-left: 5px solid #6366F1; margin-bottom: 10px; backdrop-filter: blur(10px); }
+    .comp-box-recommended { background-color: rgba(6, 78, 59, 0.6); padding: 16px; border-radius: 10px; border-left: 5px solid #10B981; margin-bottom: 10px; backdrop-filter: blur(10px); }
+    .box-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; opacity: 0.8; }
     .title-orig { color: #A5B4FC; }
     .title-rec { color: #6EE7B7; }
     .part-mpn { font-size: 1.25rem; font-weight: 800; color: #FFFFFF; margin-bottom: 4px; }
+    .part-detail { font-size: 0.9rem; color: #CBD5E1; margin-bottom: 4px; }
+    
+    /* Badges */
     .risk-high { color: #EF4444; font-weight: 700; }
     .risk-medium { color: #F59E0B; font-weight: 700; }
     .risk-low { color: #10B981; font-weight: 700; }
+    .confidence-badge { background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; display: inline-block; margin-bottom: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
-# Header Section
-if os.path.exists("logo.png"):
-    st.image("logo.png", width=400)
+# Header
+st.markdown('<div class="main-header">MechGuard AI</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Enterprise Mechanical Component Risk & Sourcing Engine</div>', unsafe_allow_html=True)
 
-st.markdown('<div class="main-header">Engineer Confidence. Secure Your Supply Chain.</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">AI-Powered Mechanical Component Risk Analysis & Alternative Sourcing</div>', unsafe_allow_html=True)
-
-# -----------------------------------------------------------------------------
-# 2. Sidebar Navigation
-# -----------------------------------------------------------------------------
+# Sidebar
 with st.sidebar:
-    if os.path.exists("logo.png"):
-        st.image("logo.png", width=400)
     st.title("System Status")
-    st.success("️ MechGuard AI Core: Active")
-    st.info("🔧 Material Availability & Manufacturing Risk Analysis: Active")
+    st.success("️ Core Engine: Active")
+    st.info("🔧 Risk Analysis: Ready")
     st.markdown("---")
-    st.caption("• **Low Risk (🟢):** Standard parts, multiple suppliers, stable materials")
-    st.caption("• **Medium Risk (🟡):** Limited suppliers, material constraints, long lead times")
-    st.caption("• **High Risk (🔴):** Single source, obsolete processes, material scarcity")
-     #  HERE IS THE BACK BUTTON 👇
+    st.caption("• **Low Risk (🟢):** Standard, stable supply")
+    st.caption("• **Medium Risk (🟡):** Limited suppliers")
+    st.caption("• **High Risk (🔴):** Single source/Obsolete")
     st.markdown("---")
+    st.caption("⚠️ **Disclaimer:** AI suggestions require human engineering verification before production.")
+    st.markdown("---") 
     st.page_link("https://mechxguard.netlify.app", label="← Back to Landing Page", icon="🏠")
 
 # -----------------------------------------------------------------------------
-# 3. AI Engine Core Functions
+# 2. AI Engine Core Functions (Foolproof Prompting & Parsing)
 # -----------------------------------------------------------------------------
-def analyze_mechanical_components_with_groq(bom_data_str, api_key):
+def analyze_mechanical_components(bom_data_str, api_key):
     try:
         client = Groq(api_key=api_key)
 
         prompt = f"""
-You are an expert Mechanical Engineering Supply Chain Analyst, Manufacturing Process Specialist, and Material Science Expert.
-Analyze mechanical components in this Bill of Materials (BOM) for supply chain risks, material availability, and recommend alternatives.
+You are an expert Mechanical Engineering Supply Chain Analyst. 
+Analyze the following mechanical Bill of Materials (BOM) data.
 
+DATA:
 {bom_data_str}
 
-MANDATORY PARSING PROTOCOL:
-- Component Type: Fastener, Bearing, Gear, Spring, Structural, Housing, Custom Machined, etc.
-- Material Spec: e.g., '6061-T6 Aluminum', '304 Stainless Steel', 'Delrin POM'
-- Standard: ISO, DIN, ANSI, ASME, JIS, ASTM
-- Manufacturing Process: CNC, Injection Molding, Stamping, Casting, Forging, 3D Printing
-- Dimensions & Tolerances: IT6, IT7, ±0.1mm
-- Surface Finish: Anodizing, Plating, Heat Treatment, Powder Coat
+TASK:
+For each component, perform a deep technical analysis. You MUST output ONLY a valid JSON array. No markdown, no conversational text.
 
-RISK CATEGORIES:
-- LOW RISK: Standard part, 3+ suppliers, common material, lead time < 4 weeks
-- MEDIUM RISK: Semi-custom, 2-3 suppliers, specialized process, lead time 4-12 weeks
-- HIGH RISK: Custom/single-source, scarce material, obsolete process, lead time > 12 weeks
-
-ALTERNATIVE RULES:
-- Material substitutions (6061-T6 → 7075-T6, 304 SS → 316 SS)
-- Process alternatives (CNC → Casting, Machined → Injection Molded)
-- Standard conversions (Metric ↔ Imperial)
-- DFM improvements
-
-STRICT JSON OUTPUT (array format):
+STRICT JSON SCHEMA:
 [
   {{
-    "part_number": "M8-1.25 x 25mm Socket Head Cap Screw",
-    "component_type": "Fastener - Socket Head Cap Screw",
-    "material": "Alloy Steel Grade 8.8",
-    "standard": "ISO 4762 / DIN 912",
-    "manufacturing_process": "Cold Forming + Thread Rolling",
-    "current_risk_level": "Low",
-    "risk_factors": ["Standard off-the-shelf", "Multiple suppliers", "Stable material"],
-    "lead_time_weeks": 2,
-    "alternative_part": "M8-1.25 x 25mm SHCS - Stainless Steel 316",
-    "alternative_material": "316 Stainless Steel",
-    "alternative_process": "Same - Cold Forming",
-    "alternative_standard": "ISO 4762 / DIN 912",
-    "pin_compatible": "Yes - Direct drop-in replacement",
-    "key_differences": "316 SS provides superior corrosion resistance. 15-20% cost increase.",
-    "supplier_links": {{
-      "mcmaster": "https://www.mcmaster.com/",
-      "grainger": "https://www.grainger.com/",
-      "fastenal": "https://www.fastenal.com/",
-      "misumi": "https://www.misumi-ec.com/"
+    "original_part": {{
+      "name": "Exact part name/number",
+      "type": "Component category (e.g., Fastener, Bearing)",
+      "manufacturer": "Original Company (e.g., SKF, Hilti)",
+      "material": "Exact material composition"
     }},
-    "analysis": "Standard M8 SHCS with excellent availability. Consider 316 SS for corrosive environments.",
-    "dfm_recommendations": ["Standardize material across assembly", "Evaluate if Grade 8.8 is necessary"]
+    "risk_assessment": {{
+      "level": "Low, Medium, or High",
+      "lead_time_weeks": 4,
+      "risk_factors": ["Factor 1", "Factor 2"]
+    }},
+    "recommended_alternative": {{
+      "name": "Alternative part name",
+      "manufacturer": "Alternative Company",
+      "material": "Alternative material",
+      "standard": "Industry Standard (ISO/DIN/ANSI)"
+    }},
+    "compatibility": {{
+      "is_drop_in": true,
+      "logic": "1-sentence engineering reason why they are compatible (e.g., matching thread pitch and tensile strength)",
+      "required_modifications": "None or specific changes needed"
+    }},
+    "verification": {{
+      "confidence_score": 95,
+      "datasheet_search_query": "Exact search term to find the official PDF datasheet"
+    }},
+    "sourcing": {{
+      "mcmaster": "https://www.mcmaster.com/?q=PART_NUMBER",
+      "grainger": "https://www.grainger.com/search?searchQuery=PART_NUMBER"
+    }},
+    "analysis": {{
+      "summary": "Brief supply chain summary",
+      "dfm_recommendations": ["Recommendation 1"]
+    }}
   }}
 ]
-
-Output ONLY valid JSON array. No markdown, no explanations.
 """
 
         response = client.chat.completions.create(
@@ -143,48 +135,60 @@ Output ONLY valid JSON array. No markdown, no explanations.
 
         text = response.choices[0].message.content.strip()
 
-        # Clean markdown code wrappers just in case
-        if text.startswith("```json"):
-            text = text[7:]
-        if text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
+        # FOOLPROOF JSON EXTRACTION
+        # 1. Remove markdown code blocks if present
+        text = re.sub(r'^```json\s*', '', text, flags=re.MULTILINE)
+        text = re.sub(r'\s*```$', '', text, flags=re.MULTILINE)
+        
+        # 2. Find the JSON array using regex (handles any surrounding text)
+        match = re.search(r'\[.*\]', text, re.DOTALL)
+        if match:
+            json_str = match.group(0)
+            return json.loads(json_str)
+        else:
+            raise ValueError("No JSON array found in AI response.")
 
-        text = text.strip()
-
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            json_match = re.search(r'\[\s*\{.*\}\s*\]', text, re.DOTALL)
-            if json_match:
-                return json.loads(json_match.group(0))
-            raise ValueError("Failed to parse valid JSON from AI response.")
-
+    except json.JSONDecodeError as e:
+        st.error(f"⚠️ AI returned invalid JSON. Please try again. Error: {str(e)}")
+        return None
     except Exception as e:
         st.error(f"Analysis Error: {str(e)}")
         return None
 
-def render_mechanical_component_card(item):
-    part_num = str(item.get("part_number", "Unknown"))
-    comp_type = str(item.get("component_type", "N/A"))
-    material = str(item.get("material", "N/A"))
-    standard = str(item.get("standard", "N/A"))
-    mfg_process = str(item.get("manufacturing_process", "N/A"))
-    risk_level = str(item.get("current_risk_level", "Unknown"))
-    risk_factors = item.get("risk_factors", [])
-    lead_time = str(item.get("lead_time_weeks", "N/A"))
-    alt_part = str(item.get("alternative_part", "None required"))
-    alt_material = str(item.get("alternative_material", "N/A"))
-    alt_process = str(item.get("alternative_process", "N/A"))
-    pin_compat = str(item.get("pin_compatible", "N/A"))
-    diffs = str(item.get("key_differences", "None noted."))
-    analysis = str(item.get("analysis", "No analysis provided."))
-    dfm_recs = item.get("dfm_recommendations", [])
-    links = item.get("supplier_links", {})
+def render_component_card(item):
+    # Safe extraction with defaults
+    orig = item.get("original_part", {})
+    risk = item.get("risk_assessment", {})
+    alt = item.get("recommended_alternative", {})
+    compat = item.get("compatibility", {})
+    verify = item.get("verification", {})
+    sourcing = item.get("sourcing", {})
+    analysis = item.get("analysis", {})
 
-    # Risk level badge
-    risk_upper = risk_level.upper()
+    part_name = orig.get("name", "Unknown Part")
+    part_type = orig.get("type", "N/A")
+    part_mfr = orig.get("manufacturer", "N/A")
+    part_mat = orig.get("material", "N/A")
+    
+    risk_level = risk.get("level", "Unknown")
+    risk_factors = risk.get("risk_factors", [])
+    lead_time = risk.get("lead_time_weeks", "N/A")
+    
+    alt_name = alt.get("name", "None suggested")
+    alt_mfr = alt.get("manufacturer", "N/A")
+    alt_mat = alt.get("material", "N/A")
+    
+    is_drop_in = compat.get("is_drop_in", False)
+    compat_logic = compat.get("logic", "N/A")
+    
+    confidence = verify.get("confidence_score", 0)
+    ds_query = verify.get("datasheet_search_query", part_name)
+    
+    dfm_recs = analysis.get("dfm_recommendations", [])
+    summary = analysis.get("summary", "No summary provided.")
+
+    # Risk Badge Logic
+    risk_upper = str(risk_level).upper()
     if "HIGH" in risk_upper:
         badge = "🔴 HIGH RISK"
         risk_class = "risk-high"
@@ -195,24 +199,24 @@ def render_mechanical_component_card(item):
         badge = "🟢 LOW RISK"
         risk_class = "risk-low"
 
-    mcmaster_url = links.get("mcmaster", "https://www.mcmaster.com/")
-    grainger_url = links.get("grainger", "https://www.grainger.com/")
-    fastenal_url = links.get("fastenal", "https://www.fastenal.com/")
-    misumi_url = links.get("misumi", "https://www.misumi-ec.com/")
+    with st.expander(f"{badge}  |  {part_type}: {part_name}", expanded=True):
+        
+        # Confidence & Warning
+        st.markdown(f'<div class="confidence-badge">🎯 AI Confidence: {confidence}%</div>', unsafe_allow_html=True)
+        st.warning("⚠️ **Engineering Verification Required:** AI alternatives are based on standard industry equivalents. Always verify physical dimensions and official datasheets before production.")
 
-    with st.expander(f"{badge}  |  {comp_type}: {part_num}", expanded=True):
         c_left, c_right = st.columns(2)
 
         with c_left:
             left_box = (
                 '<div class="comp-box-original">'
                 '<div class="box-title title-orig">Current BOM Component</div>'
-                f'<div class="part-mpn">{part_num}</div>'
-                f'<p style="margin-bottom: 4px;"><b>Material:</b> {material}</p>'
-                f'<p style="margin-bottom: 4px;"><b>Standard:</b> {standard}</p>'
-                f'<p style="margin-bottom: 4px;"><b>Process:</b> {mfg_process}</p>'
-                f'<p style="margin-bottom: 4px;"><b>Lead Time:</b> {lead_time} weeks</p>'
-                f'<p style="margin-bottom: 0px;"><b>Risk Level:</b> <span class="{risk_class}">{risk_level}</span></p>'
+                f'<div class="part-mpn">{part_name}</div>'
+                f'<div class="part-detail"><b>Company:</b> {part_mfr}</div>'
+                f'<div class="part-detail"><b>Type:</b> {part_type}</div>'
+                f'<div class="part-detail"><b>Material:</b> {part_mat}</div>'
+                f'<div class="part-detail"><b>Lead Time:</b> {lead_time} weeks</div>'
+                f'<div class="part-detail"><b>Status:</b> <span class="{risk_class}">{risk_level}</span></div>'
                 '</div>'
             )
             st.markdown(left_box, unsafe_allow_html=True)
@@ -225,74 +229,71 @@ def render_mechanical_component_card(item):
         with c_right:
             right_box = (
                 '<div class="comp-box-recommended">'
-                '<div class="box-title title-rec">MechGuard Recommended Alternative</div>'
-                f'<div class="part-mpn">{alt_part}</div>'
-                f'<p style="margin-bottom: 4px;"><b>Alternative Material:</b> {alt_material}</p>'
-                f'<p style="margin-bottom: 4px;"><b>Process:</b> {alt_process}</p>'
-                f'<p style="margin-bottom: 0px;"><b>Compatibility:</b> {pin_compat}</p>'
+                '<div class="box-title title-rec">Recommended Alternative</div>'
+                f'<div class="part-mpn">{alt_name}</div>'
+                f'<div class="part-detail"><b>Company:</b> {alt_mfr}</div>'
+                f'<div class="part-detail"><b>Material:</b> {alt_mat}</div>'
+                f'<div class="part-detail"><b>Drop-in Replacement:</b> {"✅ Yes" if is_drop_in else "⚠️ No"}</div>'
                 '</div>'
             )
             st.markdown(right_box, unsafe_allow_html=True)
 
         st.markdown("---")
-        st.markdown("**Key Specification & Functional Differences:**")
-        st.info(diffs)
-
-        st.markdown("**Supply Chain & Manufacturing Analysis:**")
-        st.write(analysis)
+        st.markdown("** Compatibility Logic:**")
+        st.info(compat_logic)
+        
+        st.markdown("** Supply Chain Analysis:**")
+        st.write(summary)
 
         if dfm_recs:
-            st.markdown("**DFM (Design for Manufacturing) Recommendations:**")
+            st.markdown("**🛠️ DFM Recommendations:**")
             for rec in dfm_recs:
                 st.success(f"✓ {rec}")
 
-        st.markdown("**Supplier & Distributor Links:**")
-        st.markdown(f"[🔩 McMaster-Carr]({mcmaster_url}) &nbsp;|&nbsp; [🏭 Grainger]({grainger_url}) &nbsp;|&nbsp; [⚡ Fastenal]({fastenal_url}) &nbsp;|&nbsp; [🌐 MISUMI]({misumi_url})")
+        st.markdown("**🔍 Verification & Sourcing:**")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"**Datasheet Query:** `{ds_query}`")
+        with col2:
+            mc_url = sourcing.get("mcmaster", f"https://www.mcmaster.com/?q={part_name}")
+            gr_url = sourcing.get("grainger", f"https://www.grainger.com/search?searchQuery={part_name}")
+            st.markdown(f"[🔩 McMaster-Carr]({mc_url}) | [🏭 Grainger]({gr_url})")
 
 # -----------------------------------------------------------------------------
-# 4. Interface Tabs
+# 3. Interface Tabs
 # -----------------------------------------------------------------------------
-tab1, tab2 = st.tabs(["🔍 Instant Part Search", " Batch BOM Upload Audit"])
+tab1, tab2 = st.tabs(["🔍 Instant Part Search", "📁 Batch BOM Audit"])
 
 # TAB 1: INSTANT SEARCH
 with tab1:
-    st.subheader("Search Mechanical Component Risk & Alternatives")
-    st.caption("Enter any mechanical part number, description, or specification to analyze supply chain risk and find alternatives.")
-
+    st.subheader("Search Component Risk & Alternatives")
     col_input, col_btn_search = st.columns([3, 1])
     with col_input:
         search_part = st.text_input(
             "Enter Part Number or Description:", 
-            placeholder="e.g. M8-1.25 x 25mm SHCS, 6061-T6 Aluminum Bracket, 6205-2RS Bearing, 1/4-20 x 1 Hex Bolt",
+            placeholder="e.g. M8-1.25 x 25mm SHCS, 6061-T6 Bracket",
             label_visibility="collapsed"
         )
     with col_btn_search:
-        btn_search = st.button("🔎 Analyze Risk", type="primary", use_container_width=True)
+        btn_search = st.button(" Analyze Risk", type="primary", use_container_width=True)
 
     if btn_search and search_part.strip():
         active_key = get_api_key()
-        with st.spinner(f"🤖 Analyzing supply chain risk for {search_part.strip()}..."):
+        with st.spinner("🤖 Analyzing supply chain risk..."):
             query_str = f"Part: {search_part.strip()} | Single Part Risk Analysis"
-            search_results = analyze_mechanical_components_with_groq(query_str, active_key)
+            search_results = analyze_mechanical_components(query_str, active_key)
 
         if search_results:
             st.markdown("---")
-            st.subheader("🔍 Component Risk Analysis Results")
             for item in search_results:
-                render_mechanical_component_card(item)
+                render_component_card(item)
 
 # TAB 2: BATCH BOM AUDIT
 with tab2:
-    uploaded_file = st.file_uploader(
-        "Upload Mechanical BOM (CSV/XLSX)", 
-        type=["csv", "xlsx", "xls"], 
-        help="Upload CSV or Excel containing Part Number, Description, Material, Quantity columns"
-    )
+    uploaded_file = st.file_uploader("Upload Mechanical BOM (CSV/XLSX)", type=["csv", "xlsx", "xls"])
 
     if uploaded_file:
         bom_df = None
-        
-        # Multi-engine fallback parser
         try:
             bom_df = pd.read_csv(uploaded_file)
         except Exception:
@@ -304,121 +305,61 @@ with tab2:
                     uploaded_file.seek(0)
                     bom_df = pd.read_excel(uploaded_file)
                 except Exception as parse_err:
-                    st.error(f"❌ Unable to parse file structure: {str(parse_err)}. Ensure file is valid CSV/XLSX.")
+                    st.error(f"❌ Unable to parse file: {str(parse_err)}")
                     st.stop()
 
         col_map = {str(col).strip().lower(): col for col in bom_df.columns}
 
-        with st.expander(f"📄 Raw Uploaded BOM Data Preview ({len(bom_df)} Total Rows)", expanded=False):
+        with st.expander("📄 Raw BOM Preview", expanded=False):
             st.dataframe(bom_df, use_container_width=True)
 
-        col_btn_audit, _ = st.columns([1, 3])
-        with col_btn_audit:
-            run_audit = st.button("🚀 Run Full Mechanical BOM Risk Audit", type="primary", use_container_width=True)
+        btn_audit = st.button("🚀 Run Full Audit", type="primary", use_container_width=True)
 
-        if run_audit:
+        if btn_audit:
             active_key = get_api_key()
-
             bom_summary = []
             for _, row in bom_df.iterrows():
-                part_num = str(
-                    row.get(col_map.get("part number", "")) or
-                    row.get(col_map.get("part_number", "")) or
-                    row.get(col_map.get("part no", "")) or
-                    row.get(col_map.get("item number", "")) or ""
-                ).strip()
-
-                desc = str(row.get(col_map.get("description", ""), "")).strip()
-                material = str(row.get(col_map.get("material", ""), "")).strip()
-                qty = str(row.get(col_map.get("quantity", ""), "")).strip()
-
+                part_num = str(row.get(col_map.get("part number", "")) or row.get(col_map.get("part_number", "")) or "").strip()
                 if part_num and part_num.lower() != "nan":
-                    part_info = f"Part: {part_num}"
-                    if desc and desc.lower() != "nan":
-                        part_info += f" | Desc: {desc}"
-                    if material and material.lower() != "nan":
-                        part_info += f" | Material: {material}"
-                    if qty and qty.lower() != "nan":
-                        part_info += f" | Qty: {qty}"
-                    bom_summary.append(part_info)
+                    bom_summary.append(f"Part: {part_num}")
 
             if not bom_summary:
-                st.error(" No valid part numbers detected! Ensure columns like 'Part Number' or 'Part No' exist in your file.")
+                st.error("❌ No valid part numbers detected!")
             else:
                 total_items = len(bom_summary)
-                CHUNK_SIZE = 10  # Smaller chunks for detailed mechanical analysis
+                CHUNK_SIZE = 8 # Smaller chunk for higher accuracy
                 bom_chunks = [bom_summary[i:i + CHUNK_SIZE] for i in range(0, total_items, CHUNK_SIZE)]
-                total_chunks = len(bom_chunks)
-
-                st.info(f"📦 Processing **{total_items} mechanical components** across **{total_chunks} batch requests** (10 parts/batch) for detailed risk analysis...")
-
+                
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 all_results = []
 
                 for idx, chunk in enumerate(bom_chunks):
-                    status_text.text(f"⏳ Analyzing Batch {idx + 1} of {total_chunks} ({len(chunk)} parts)...")
-                    
+                    status_text.text(f" Analyzing Batch {idx + 1} of {len(bom_chunks)}...")
                     bom_data_str = "\n".join(chunk)
-                    chunk_results = analyze_mechanical_components_with_groq(bom_data_str, active_key)
-
-                    if chunk_results and isinstance(chunk_results, list):
+                    chunk_results = analyze_mechanical_components(bom_data_str, active_key)
+                    
+                    if chunk_results:
                         all_results.extend(chunk_results)
-                    else:
-                        st.warning(f"⚠️ Batch {idx + 1} returned incomplete results. Continuing processing remaining items.")
-
-                    progress_bar.progress((idx + 1) / total_chunks)
-
-                    # 1.5 second pause for detailed mechanical analysis
-                    if idx < total_chunks - 1:
+                    
+                    progress_bar.progress((idx + 1) / len(bom_chunks))
+                    if idx < len(bom_chunks) - 1:
                         time.sleep(1.5)
 
-                status_text.success("✅ Complete Mechanical BOM Risk Audit Finished!")
+                status_text.success("✅ Audit Complete!")
 
-                st.markdown("---")
                 if all_results:
                     total_parts = len(all_results)
-                    high_risk = sum(1 for x in all_results if "HIGH" in str(x.get("current_risk_level", "")).upper())
-                    medium_risk = sum(1 for x in all_results if "MEDIUM" in str(x.get("current_risk_level", "")).upper())
+                    high_risk = sum(1 for x in all_results if "HIGH" in str(x.get("risk_assessment", {}).get("level", "")).upper())
+                    medium_risk = sum(1 for x in all_results if "MEDIUM" in str(x.get("risk_assessment", {}).get("level", "")).upper())
                     low_risk = total_parts - (high_risk + medium_risk)
 
-                    risk_score = round(((high_risk * 1.0 + medium_risk * 0.5) / max(total_parts, 1)) * 100, 1)
-
-                    # Executive KPI Summary Dashboard
-                    st.subheader("📊 Mechanical BOM Risk Overview")
                     m1, m2, m3, m4 = st.columns(4)
-                    m1.metric("Total Components Audited", total_parts)
-                    m2.metric("Low Risk Components", low_risk, delta="Stable Supply", delta_color="normal")
-                    m3.metric("At-Risk Components", medium_risk + high_risk, delta=f"{high_risk} High | {medium_risk} Medium", delta_color="inverse")
-                    m4.metric("Overall Risk Score", f"{risk_score}%", delta="Critical Review Needed" if risk_score > 30 else "Acceptable Risk", delta_color="inverse" if risk_score > 30 else "normal")
+                    m1.metric("Total Parts", total_parts)
+                    m2.metric("Low Risk", low_risk)
+                    m3.metric("Medium Risk", medium_risk)
+                    m4.metric("High Risk", high_risk)
 
                     st.markdown("---")
-                    st.subheader(" Component Risk Analysis & Alternative Matrix")
-
-                    export_rows = []
                     for item in all_results:
-                        render_mechanical_component_card(item)
-
-                        export_rows.append({
-                            "Part Number": str(item.get("part_number", "")),
-                            "Component Type": str(item.get("component_type", "")),
-                            "Current Material": str(item.get("material", "")),
-                            "Risk Level": str(item.get("current_risk_level", "")),
-                            "Lead Time (Weeks)": str(item.get("lead_time_weeks", "")),
-                            "Alternative Part": str(item.get("alternative_part", "")),
-                            "Alternative Material": str(item.get("alternative_material", "")),
-                            "Key Differences": str(item.get("key_differences", "")),
-                            "Supply Chain Analysis": str(item.get("analysis", ""))
-                        })
-
-                    st.markdown("---")
-                    export_df = pd.DataFrame(export_rows)
-                    csv_data = export_df.to_csv(index=False).encode('utf-8')
-
-                    st.download_button(
-                        label=f"📥 Export Full Mechanical Risk Report ({len(export_df)} Items CSV)",
-                        data=csv_data,
-                        file_name="MechGuard_Full_BOM_Risk_Report.csv",
-                        mime="text/csv",
-                        type="primary"
-                    )
+                        render_component_card(item)
